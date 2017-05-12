@@ -1,0 +1,3 @@
+build/*
+dist/*
+spore.egg-info/*

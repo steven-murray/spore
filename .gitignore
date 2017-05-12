@@ -1,0 +1,5 @@
+build/*
+dist/*
+spore.egg-info/*
+*.pyc
+*.ipynb_checkpoints*
