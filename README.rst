@@ -31,7 +31,7 @@ Installation
 **Non-python-users**
 
 If you don't use python much, I suggest installing the Anaconda python distribution for your OS, and ideally creating
-an env for using spore:
+an env for using spore::
 
 
     $ conda create --name spore_env numpy scipy astropy
@@ -42,7 +42,7 @@ Once you've done this, continue to the next step...
 
 **Python users**
 
-If you already/now have a working python environment, you *should* just be able to do the following:
+If you already/now have a working python environment, you *should* just be able to do the following::
 
 
     $ pip install git+git://github.com/steven-murray/spore.git
