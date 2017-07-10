@@ -38,11 +38,12 @@ class PoissonProcessForegrounds(object):
     SED's are the same for every object, and are a power law in region of interest.
     """
 
-    def __init__(self, source_counts, beam_model, sky_size=4,
+    def __init__(self, source_counts, beam_model, spec_index_model, sky_size=4,
                  ncells=100,seed=None):
 
         self.source_counts = source_counts
         self.beam_model = beam_model
+        self.spec_index_model = spec_index_model
 
         self.nu = self.source_counts.nu
 
@@ -79,13 +80,15 @@ class PoissonProcessForegrounds(object):
 
         # Get all sources within the largest window
         nexpected = self.source_counts.total_number_density * np.max(self.sky_size) ** 2
-        ntot = np.random.poisson(nexpected)
+        ntot = np.random.poisson(nexpected.value)
         S = self.source_counts.sample_source_counts(ntot, ret_nu_array=False)
 
         sz = np.max(self.sky_size/2)
-        pos = np.random.uniform(-sz,sz,size=(2,ntot))
+        pos = np.random.uniform(-sz.value,sz.value,size=(2,ntot))
 
-        return S, pos
+        gamma = self.spec_index_model.sample(ntot)
+
+        return S, pos, gamma
 
     @cached_property
     def sky(self):
@@ -97,14 +100,14 @@ class PoissonProcessForegrounds(object):
         """
         # Note that while actually sampling the flux densities of each source is
         # horribly inefficient, it seems necessary. Otherwise the distribution of sbins is discrete.
-        S, pos = self._get_pointed_sky()
+        S, pos, gamma = self._get_pointed_sky()
 
         sbins = [0]*len(self.sky_size)
-        for i, sz in enumerate(self.sky_size.value):
+        for i, (sz,nu) in enumerate(zip(self.sky_size.value, self.nu)):
             mask = np.logical_and(np.logical_and(pos[0]>-sz/2,pos[0]<sz/2),np.logical_and(pos[1]>-sz/2,pos[1]<sz/2))
-            sbins[i] = np.histogram2d(pos[0,mask],pos[1,mask],bins=np.concatenate((self.lgrid[i],[sz/2])),weights=S[mask])[0] /self.cell_area[i]
+            sbins[i] = np.histogram2d(pos[0,mask],pos[1,mask],bins=np.concatenate((self.lgrid[i],[sz/2])),weights=S[mask] * (nu/self.nu[0])**(-gamma[mask]))[0] /self.cell_area[i]
 
-        return ((self.nu/self.nu[0])**-self.source_counts.spectral_index * np.array(sbins).T).T
+        return np.array(sbins)
 
 
     def beam_attenuation(self):
@@ -222,7 +225,8 @@ class ClusteredForegrounds(PoissonProcessForegrounds):
 
         pos = self.powerbox.create_discrete_sample(self.source_counts.total_number_density.value)
         S = self.source_counts.sample_source_counts(len(pos), ret_nu_array=False)
-        return S, pos.T
+        gamma = self.spec_index_model.sample(len(pos))
+        return S, pos.T, gamma
 
 
 class ClusteredForegroundsOnly(PoissonProcessForegrounds):
