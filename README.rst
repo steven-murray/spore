@@ -53,6 +53,6 @@ All the dependencies should be automatically installed.
 
 Usage
 ~~~~~
-I'll update this later, but for now, have a look at the notebook ``devel/paper_plots.ipynb``.
+See the notebook ``docs/examples/getting_started.ipynb``.
 
 
