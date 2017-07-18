@@ -32,7 +32,7 @@ class SourceCounts(object):
     -----------
     SED's are the same for every object, and are a power law in region of interest.
     """
-    def __init__(self,Smax0,Smin0=0,nu=1,spectral_index = 0.8, **parameters):
+    def __init__(self,Smax0,Smin0=0,f0=1,spectral_index = 0.8, **parameters):
 
         # Ensure units
         Smax0 = ensure_unit(Smax0, un.Jy)
@@ -40,12 +40,12 @@ class SourceCounts(object):
 
         self.Smax0 = Smax0
         self.Smin0 = Smin0
-        self.nu = np.atleast_1d(nu)
+        self.f0 = np.atleast_1d(f0)
         self.spectral_index = spectral_index
 
         self.params = parameters
 
-    def dnds(self,s):
+    def dnds(self, s):
         """
         The source count function
         """
@@ -57,15 +57,15 @@ class SourceCounts(object):
 
     @cached_property
     def total_number_density(self):
-        return simps(self.source_counts0(self._svec), self._svec)
+        return simps(self.dnds(self._svec), self._svec)
 
     @cached_property
     def total_flux_density(self):
-        return self.nu ** -self.spectral_index*simps(self._svec*self.dnds(self._svec), self._svec)
+        return self.f0 ** -self.spectral_index * simps(self._svec * self.dnds(self._svec), self._svec)
 
     @cached_property
     def total_squared_flux_density(self):
-        return np.outer(self.nu,self.nu) ** (-self.spectral_index)*simps(self._svec**2*self.dnds(self._svec), self._svec)
+        return np.outer(self.f0, self.f0) ** (-self.spectral_index) * simps(self._svec ** 2 * self.dnds(self._svec), self._svec)
 
     @cached_property
     def mean_flux_density_of_source(self):
@@ -87,7 +87,7 @@ class PowerLawSourceCounts(SourceCounts):
 
     def mu(self,n):
         beta = self.params['beta']
-        nufac = nfold_outer(self.nu, n) ** - self.spectral_index
+        nufac = nfold_outer(self.f0, n) ** - self.spectral_index
         smx = self.Smax0/un.Jy
         smn = self.Smin0/un.Jy
         return nufac * self.params['alpha'] * (self.Smax0**(n+1) * smx**-beta - self.Smin0**(n+1)*smn**-beta)/(n+1-beta)
@@ -128,9 +128,9 @@ class PowerLawSourceCounts(SourceCounts):
         nu0_sample =((smx - smn)*np.random.uniform(size=N) + smn) ** (1./(1 - beta))
 
         if ret_nu_array:
-            return np.outer(self.nu, nu0_sample * un.Jy)
+            return np.outer(self.f0, nu0_sample * un.Jy)
         else:
-            return self.nu[0] * nu0_sample * un.Jy
+            return self.f0[0] * nu0_sample * un.Jy
 
 
 class MultiPowerLawSourceCounts(SourceCounts):
@@ -196,7 +196,7 @@ class MultiPowerLawSourceCounts(SourceCounts):
 
     def _get_mu_in_sections(self,n):
         beta = self.params['beta']
-        nufac = nfold_outer(self.nu, n) ** - self.spectral_index
+        nufac = nfold_outer(self.f0, n) ** - self.spectral_index
 
         intg = np.zeros(len(beta)) * self.alpha[0].unit * self.Smax0.unit**(n+1)
         for i, (sb, b) in enumerate(zip(self.sbreak[:-1], beta)):
@@ -266,6 +266,6 @@ class MultiPowerLawSourceCounts(SourceCounts):
                          1./(1 - b))
 
         if ret_nu_array:
-            return np.outer(self.nu, nu0_sample) * un.Jy
+            return np.outer(self.f0, nu0_sample) * un.Jy
         else:
-            return self.nu[0] * nu0_sample * un.Jy
+            return self.f0[0] * nu0_sample * un.Jy

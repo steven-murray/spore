@@ -20,8 +20,8 @@ class Beam(Cmpt):
     """
     _defaults = {}
 
-    def __init__(self,nu0,nu=1,**params):
-        self.nu = np.atleast_1d(nu)
+    def __init__(self,nu0,f0=1,**params):
+        self.f0 = np.atleast_1d(f0)
         self.nu0 = ensure_unit(nu0, un.MHz)
 
         super(Beam,self).__init__(**params)
@@ -67,7 +67,7 @@ class CircularGaussian(CircularBeam):
 
     @cached_property
     def sigma(self):
-        return (self.params['epsilon']*constants.c/(self.nu*self.nu0*self.params['D'])).to(un.dimensionless_unscaled) * un.rad
+        return (self.params['epsilon'] * constants.c / (self.f0 * self.nu0 * self.params['D'])).to(un.dimensionless_unscaled) * un.rad
 
     def beam(self,l,m=None):
         "The beam attenuation at l,m"
