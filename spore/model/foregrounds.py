@@ -227,19 +227,6 @@ class PointSourceCircularGaussian(object):
         return self._get_power_cov(self.total_covariance, taper, natural_units, Aeff,diagonal)
 
 
-    # def _get_power_spectrum_2d(self, cov, Aeff,window=None):
-    #     return get_ps_from_cov(cov, self.nu*self.beam_model.nu0, self.u, Aeff,window=window)
-    #
-    # def power_spec_2d_poisson(self, Aeff,window=None):
-    #     return self._get_power_spectrum_2d(self.poisson_covariance, Aeff,window=window)
-    #
-    # def power_spec_2d_clustering(self, Aeff,window=None):
-    #     return self._get_power_spectrum_2d(self.clustered_only_covariance, Aeff,window=window)
-    #
-    # def power_spec_2d(self, Aeff,window=None):
-    #     return self._get_power_spectrum_2d(self.total_covariance, Aeff,window=window)
-
-
 class CircularGaussianPowerLaw(PointSourceCircularGaussian):
 
     def __init__(self,*args,**kwargs):

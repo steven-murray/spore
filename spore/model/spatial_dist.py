@@ -5,6 +5,8 @@ import spore.measure.unit_conversions as uc
 from powerbox import LogNormalPowerBox, PowerBox
 from scipy.interpolate import griddata
 from _framework import Component as Cmpt
+from spore.measure.unit_conversions import ensure_unit
+from astropy.units import rad, sr
 
 class SpatialDistribution(Cmpt):
     """
@@ -32,12 +34,12 @@ class SpatialDistribution(Cmpt):
 
     def __init__(self, f0=1, sky_size=1., ncells=100, seed=None, *args, **kwargs):
         super(SpatialDistribution, self).__init__(*args, **kwargs)
-        self.f0 = np.array(f0)
+        self.f0 = np.atleast_1d(f0)
 
         if np.isscalar(sky_size):
-            self.sky_size = sky_size/self.f0
+            self.sky_size = ensure_unit(sky_size/self.f0, rad)
         else:
-            self.sky_size = sky_size
+            self.sky_size = ensure_unit(sky_size, rad)
 
         self.ncells = ncells
         self.seed = seed
@@ -142,6 +144,11 @@ class PureClustering_FlatSky(PureClustering):
                             dim=2, boxlength=np.max(self.sky_size).value,a=self.a,b=2*np.pi)
 
     def sky(self, sbar):
+
+        sbar = np.atleast_1d(sbar)
+
+        assert len(sbar) == len(self.f0), "sbar must be a vector of length len(f0)"
+
         if self.seed is not None:
             np.random.seed(self.seed)
 
@@ -169,6 +176,7 @@ class PoissonClustering_FlatSky(PoissonClustering, PureClustering_FlatSky):
     _defaults.update({"use_lognormal":True})
 
     def source_positions(self, nbar):
+        nbar = ensure_unit(nbar, 1/sr)
         if self.seed is not None:
             np.random.seed(self.seed)
 

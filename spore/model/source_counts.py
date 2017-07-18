@@ -6,8 +6,9 @@ import numpy as np
 from scipy.integrate import simps
 from spore.common_tools import ensure_unit, nfold_outer
 from spore.measure.unit_conversions import un
+from _framework import Component as Cmpt
 
-class SourceCounts(object):
+class SourceCounts(Cmpt):
     """
     A general source counts class.
 
@@ -32,6 +33,7 @@ class SourceCounts(object):
     -----------
     SED's are the same for every object, and are a power law in region of interest.
     """
+    _defaults = {}
     def __init__(self,Smax0,Smin0=0,f0=1,spectral_index = 0.8, **parameters):
 
         # Ensure units
@@ -75,6 +77,9 @@ class SourceCounts(object):
         pass
 
 class PowerLawSourceCounts(SourceCounts):
+
+    _defaults = {"alpha":6998.,
+                 "beta":1.54}
 
     def __init__(self,*args,**kwargs):
         super(PowerLawSourceCounts,self).__init__(*args,**kwargs)
@@ -128,12 +133,15 @@ class PowerLawSourceCounts(SourceCounts):
         nu0_sample =((smx - smn)*np.random.uniform(size=N) + smn) ** (1./(1 - beta))
 
         if ret_nu_array:
-            return np.outer(self.f0, nu0_sample * un.Jy)
+            return np.outer(self.f0**-self.spectral_index, nu0_sample * un.Jy)
         else:
             return self.f0[0] * nu0_sample * un.Jy
 
 
 class MultiPowerLawSourceCounts(SourceCounts):
+    _defaults = {"alpha":6998.,
+                 "beta":[1.54],
+                 "Sbreak":[0.006]}
     """
     A source count model consisting of continuous (but not continuous derivatives) broken power-laws.
     

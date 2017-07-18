@@ -3,11 +3,7 @@ A module for producing point-source foreground mocks.
 """
 import numpy as np
 from cached_property import cached_property
-from spore.model.source_counts import PowerLawSourceCounts
-from spore.model.beam import CircularGaussian
 
-
-from spore.model.spatial_dist import PureClustering, PoissonClustering
 
 from powerbox.powerbox import _magnitude_grid
 from powerbox.dft import fft, fftfreq
@@ -30,7 +26,7 @@ class PointSourceForegrounds(object):
     spec_index_model : :class:`spore.model.spectral_index.SpecIndex` instance
         An instance of `SpecIndex` (via a subclass) which contains a model for the spectral index distribution
 
-    spatial_model : :class:`spore.model.spatial_dist.SpatialDistribution` instance
+    spatial_dist : :class:`spore.model.spatial_dist.SpatialDistribution` instance
         An instance of `SpatialDistribution` (via a subclass) which contains a model for the spatial distribution of flux.
     """
 
@@ -57,8 +53,8 @@ class PointSourceForegrounds(object):
         """
         Returns
         -------
-        sbins : (ncells,ncells)-array
-            A gridded realisation of the total flux density in each cell, at `nu[0]`. Units Jy/Hz/rad^2
+        sbins : (nf0,ncells,ncells)-array
+            A gridded realisation of the total flux density in each cell at each frequency. Units Jy/Hz/rad^2
         """
         if not hasattr(self.spatial_dist, "source_positions"):
             return self.spatial_dist.sky(self.source_counts.total_flux_density)
@@ -71,7 +67,9 @@ class PointSourceForegrounds(object):
                                          self.spec_index_model.sample(n))
 
     def beam_attenuation(self):
-
+        """
+        Return the beam attenuation/response at each gridpoint on the sky (i.e. on :attr:`.spatial_dist.lgrid`)
+        """
         L = np.zeros((len(self.f0), self.spatial_dist.ncells, self.spatial_dist.ncells))
         M = np.zeros((len(self.f0), self.spatial_dist.ncells, self.spatial_dist.ncells))
 
@@ -81,22 +79,31 @@ class PointSourceForegrounds(object):
 
     def visible_sky(self):
         """
-        The beam-attenuated brightness of the sky. A 3D array, with first index corresponding to nu, and last two
+        The beam-attenuated brightness of the sky. A 3D array, with first index corresponding to `f0`, and last two
         corresponding to sky position (l,m).
         """
         return self.beam_attenuation() * self.sky
 
     @cached_property
     def visibility(self):
+        """
+        The visibilities of :meth:`visible_sky` over a uniform (u,v)-grid,  defined as :attr:`ugrid_raw0`.
+        """
         # Note that base fft in numpy is equivalent to \int f(x) e^{-2pi i kx} dx
         return ((fft(self.visible_sky(), axes=(-2,-1),a=0,b=2*np.pi)[0]).T*self.spatial_dist.cell_area).T
 
     @cached_property
     def ugrid_raw0(self):
+        """
+        The 1D grid of u (fourier dual of l) at nu0. Used as the grid on a side of a 2D grid of the sky.
+        """
         return fftfreq(self.spatial_dist.ncells, d=self.spatial_dist.resolution[0],b=2*np.pi)
 
     @cached_property
     def _ugrid0(self):
+        """
+        The magnitude of u at each point of a 2D grid of the sky, in the fourier-dual of l.
+        """
         return _magnitude_grid(self.ugrid_raw0,2)
 
     @cached_property
@@ -121,12 +128,15 @@ class PointSourceForegrounds(object):
         return self._weights_edges_centres[0]
 
     def _circavg(self,X):
-        "Return the circular average of X in u"
+        "Return the circular average of X in :attr:`ugrid`"
         return np.histogram(self._ugrid0.flatten(), bins=self._ugrid_edges,
                             weights=X.flatten())[0]/self._grid_weights
 
     @cached_property
     def visibility_1d(self):
+        """
+        The complex visibility, after circular averaging. Corresponds to :attr:`ugrid`
+        """
         vis = np.zeros((len(self.f0), len(self.ugrid)), dtype="complex128")
         for i in range(len(self.f0)):
             vis_rl = self._circavg(np.real(self.visibility[i]))
@@ -136,6 +146,9 @@ class PointSourceForegrounds(object):
 
     @cached_property
     def visibility_squared_circular(self):
+        """
+        The circular average of the modulus squared of the visibility. Corresponds to :attr:`ugrid`.
+        """
         n = len(self.f0)
         vis2 = np.zeros((n,n, len(self.ugrid)))
 
@@ -146,69 +159,3 @@ class PointSourceForegrounds(object):
                 vis2[i,j+i] = self._circavg(v2)
                 vis2[j+i,i] = self._circavg(v2)
         return vis2
-
-#
-# class ClusteredForegrounds(PoissonProcessForegrounds):
-#     a = 0
-#     b = 2*np.pi
-#
-#     def __init__(self,point_source_power_spec, use_lognormal=True, *args,**kwargs):
-#         self.point_source_power_spec = point_source_power_spec
-#         self.use_lognormal = use_lognormal
-#
-#         super(ClusteredForegrounds,self).__init__(*args,**kwargs)
-#
-#     @cached_property
-#     def powerbox(self):
-#         if self.use_lognormal:
-#             return LogNormalPowerBox(N=self.ncells, pk=self.point_source_power_spec,
-#                                      dim=2, boxlength=np.max(self.sky_size).value,a=self.a,b=self.b)
-#         else:
-#             return PowerBox(N=self.ncells, pk=self.point_source_power_spec,
-#                             dim=2, boxlength=np.max(self.sky_size).value,a=self.a,b=self.b)
-#
-#     def _get_pointed_sky(self):
-#         if self.seed is not None:
-#             np.random.seed(self.seed)
-#
-#         pos = self.powerbox.create_discrete_sample(self.source_counts.total_number_density.value)
-#         S = self.source_counts.sample_source_counts(len(pos), ret_nu_array=False)
-#         gamma = self.spec_index_model.sample(len(pos))
-#         return S, pos.T, gamma
-#
-#
-# class ClusteredForegroundsOnly(PoissonProcessForegrounds):
-#     a = 0
-#     b = 2*np.pi
-#
-#     def __init__(self, point_source_power_spec, use_lognormal=True, *args, **kwargs):
-#         self.point_source_power_spec = point_source_power_spec
-#         self.use_lognormal = use_lognormal
-#         super(ClusteredForegroundsOnly, self).__init__(*args, **kwargs)
-#
-#     @cached_property
-#     def powerbox(self):
-#         if self.use_lognormal:
-#             return LogNormalPowerBox(N=self.ncells, pk=self.point_source_power_spec,
-#                                      dim=2, boxlength=np.max(self.sky_size.value),a=self.a,b=self.b)
-#         else:
-#             return PowerBox(N=self.ncells, pk=self.point_source_power_spec,
-#                             dim=2, boxlength=np.max(self.sky_size).value,a=self.a,b=self.b)
-#     @cached_property
-#     def sky(self):
-#         if self.seed is not None:
-#             np.random.seed(self.seed)
-#
-#         density = self.powerbox.delta_x() + 1
-#         coords_x, coords_y = np.meshgrid(self.lgrid[0],self.lgrid[0])
-#
-#         Sbins = np.zeros((len(self.nu),self.ncells,self.ncells))
-#         for i, nu in enumerate(self.nu):
-#             if i==0:
-#                 Sbins[i] = self.source_counts.total_flux_density[i]*density
-#             else:
-#                 x,y = np.meshgrid(self.lgrid[i],self.lgrid[i])
-#                 Sbins[i] = griddata((coords_x.flatten(), coords_y.flatten()), density.flatten(), (x,y),method="cubic")*self.source_counts.total_flux_density[i]
-#
-#         return Sbins
-

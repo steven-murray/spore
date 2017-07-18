@@ -20,7 +20,6 @@ def visibility_covariance(foreground_model = PointSourceForegrounds, niter=30,se
 
     cov -= np.real(np.einsum('ij,kj->ikj',meanvis,np.conj(meanvis)))
 
-
     if cov.shape[0] == 1:
         cov = cov[0,0]
 
