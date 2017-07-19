@@ -60,7 +60,7 @@ class PointSourceForegrounds(object):
             return self.spatial_dist.sky(self.source_counts.total_flux_density)
 
         else:
-            pos = self.spatial_dist.source_positions(self.source_counts.total_number_density)
+            pos = self.spatial_dist.source_positions(self.source_counts.total_number_density.value)
             n  = len(pos[0])
             return self.spatial_dist.sky(pos,
                                          self.source_counts.sample_source_counts(n),

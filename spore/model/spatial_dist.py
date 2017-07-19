@@ -8,6 +8,8 @@ from _framework import Component as Cmpt
 from spore.measure.unit_conversions import ensure_unit
 from astropy.units import rad, sr
 
+from healpy import sphtfunc, pixelfunc
+
 class SpatialDistribution(Cmpt):
     """
     Base class for generating on-sky spatial distributions.
@@ -176,11 +178,10 @@ class PoissonClustering_FlatSky(PoissonClustering, PureClustering_FlatSky):
     _defaults.update({"use_lognormal":True})
 
     def source_positions(self, nbar):
-        nbar = ensure_unit(nbar, 1/sr)
         if self.seed is not None:
             np.random.seed(self.seed)
 
-        pos = self._powerbox.create_discrete_sample(nbar.value)
+        pos = self._powerbox.create_discrete_sample(nbar)
         return pos.T
 
     def sky(self, pos, fluxes, spec_indices):
@@ -192,3 +193,137 @@ class PoissonClustering_FlatSky(PoissonClustering, PureClustering_FlatSky):
                                       weights=fluxes[mask] * f0 ** (-spec_indices[mask]))[0] / self.cell_area[i]
 
         return np.array(sbins)
+
+
+class PureClustering_Spherical(PureClustering):
+    _defaults = PureClustering._defaults
+    _defaults.update({"nside":64,
+                      "lmax":1000})
+
+    @cached_property
+    def _healpix_deltax(self):
+        l = np.arange(1,self.params['lmax'])
+        cls = self.params['power_spectrum'](l)
+        return sphtfunc.synfast(cls, self.params['nside'])
+
+    def healpix_brightness(self, sbar):
+        sbar = np.atleast_1d(sbar)
+        dx = self._healpix_deltax
+        return [(1+dx)*s for s in sbar]
+
+    def sky(self, sbar):
+        healpix = self.healpix_brightness(sbar)
+
+        lm_map = [np.zeros(self.ncells * self.ncells) * np.nan] * len(self.f0)
+        for i,hp in enumerate(healpix):
+            # Convert lgrid to co-lat and longitude in radians.
+            L, M = np.meshgrid(self.lgrid[i].value, self.lgrid[i].value)
+            lm = np.sqrt(L**2+M**2).flatten()
+            mask = lm < 1
+
+            theta = np.arcsin(lm[mask])
+            phimod = np.arccos(L.flatten()[mask] / lm[mask])
+            phi = np.where(M.flatten()[mask] < 0, phimod, -phimod)
+            phi[np.isnan(phi)] = 0.0
+
+            # Generate map from interpolation
+            lm_map[i][mask] = pixelfunc.get_interp_val(hp, theta, phi)
+            lm_map[i] = lm_map[i].reshape((self.ncells, self.ncells))
+
+        return np.array(lm_map)
+
+
+def randsphere(n, theta_range = (0,np.pi), phi_range = (0,2*np.pi)):
+    """
+    Generate random angular theta, phi points on the sphere
+
+
+    Parameters
+    ----------
+    n: integer
+        The number of randoms to generate
+
+    Returns
+    -------
+    theta,phi: tuple of arrays
+    """
+    phi = np.random.random(n)
+    phi = phi*(phi_range[1]-phi_range[0]) + phi_range[0]
+
+    cos_theta_min=np.cos(theta_range[0])
+    cos_theta_max=np.cos(theta_range[1])
+
+    v = np.random.random(n)
+    v *= (cos_theta_max-cos_theta_min)
+    v += cos_theta_min
+
+    theta = np.arccos(v)
+
+    return theta, phi
+
+
+class PoissonClustering_Spherical(PoissonClustering_FlatSky):
+    _defaults = PoissonClustering_FlatSky._defaults
+    _defaults.update({"nside":64,
+                      "lmax":1000})
+    @property
+    def _powerbox(self):
+        raise AttributeError("'PoissonClustering_Spherical' object has no attribute '_powerbox'")
+
+    @cached_property
+    def _healpix_deltax(self):
+        l = np.arange(1,self.params['lmax'])
+        cls = self.params['power_spectrum'](l)
+        return sphtfunc.synfast(cls, self.params['nside'])
+
+    def source_positions_ang(self, nbar):
+        dx = self._healpix_deltax+1
+
+        # Limit the range on the sky that we populate for efficiency
+        maxtheta = self.get_maxtheta()
+        angular_size = 2*np.pi*(1 - np.cos(maxtheta))
+
+        ntot = np.random.poisson(nbar * angular_size)
+        pos = np.zeros((2,ntot))
+
+        ndone = 0
+        nleft = ntot
+
+        pixweights = dx / np.max(dx)
+        overweight = len(pixweights)/np.sum(pixweights)
+
+        while nleft > 0:
+            theta, phi = randsphere(int(nleft*overweight), theta_range=(0,maxtheta))
+            pix = pixelfunc.ang2pix(self.params['nside'], theta, phi)
+            weights = pixweights[pix]
+
+            rnd = np.random.random(len(theta))
+            w, = np.where(rnd < weights)
+            if w.size > 0:
+                if w.size >  nleft:
+                    theta = theta[w][:nleft]
+                    phi = phi[w][:nleft]
+                else:
+                    theta = theta[w]
+                    phi = phi[w]
+
+                pos[:,ndone:ndone+min(w.size,nleft)] = np.array([theta,phi])
+
+            ndone += w.size
+            nleft -= w.size
+
+        return pos
+
+    def get_maxtheta(self):
+        maxl = min(np.sqrt(2) * np.max(self.sky_size.value/2), 1)
+        return np.arcsin(maxl)
+
+    def source_positions(self, nbar):
+        theta, phi = self.source_positions_ang(nbar)
+        l = np.sin(theta) * np.cos(phi)
+        m = np.sin(theta) * np.sin(phi)
+
+        return np.array([l,m])
+
+    def sky(self, pos, fluxes, spec_indices):
+        return PoissonClustering_FlatSky.sky(self,pos, fluxes, spec_indices)
