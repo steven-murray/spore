@@ -35,6 +35,11 @@ resample = Extension('spore.fortran_routines.resample', ['spore/fortran_routines
                     f2py_options=['only:', "lay_ps_map", ":"],
                     libraries=['gomp']
                     )
+direct_ft = Extension('spore.fortran_routines.direct_ft', ['spore/fortran_routines/direct_ft.f90'],
+                    extra_f90_compile_args=['-Wall', '-fopenmp'],
+                    f2py_options=['only:', "direct_ft", ":"],
+                    libraries=['gomp']
+                    )
 
 setup(
     name="spore",
@@ -53,7 +58,7 @@ setup(
     license="MIT",
     keywords="epoch of reionisation power spectrum",
     url="https://github.com/steven-murray/spore",
-    ext_modules=[resample],
+    ext_modules=[resample, direct_ft],
     packages=find_packages(),#['halomod', 'halomod.fort'] if os.getenv("WITH_FORTRAN", None) else ['halomod'],
 
     # could also include long_description, download_url, classifiers, etc.

@@ -135,7 +135,7 @@ class PowerLawSourceCounts(SourceCounts):
         if ret_nu_array:
             return np.outer(self.f0**-self.spectral_index, nu0_sample * un.Jy)
         else:
-            return self.f0[0] * nu0_sample * un.Jy
+            return nu0_sample * un.Jy
 
 
 class MultiPowerLawSourceCounts(SourceCounts):
@@ -249,31 +249,28 @@ class MultiPowerLawSourceCounts(SourceCounts):
         #
         # return np.outer(self.nu,self.nu) ** (-self.spectral_index)*intg
 
-    def sample_source_counts(self,area,ret_nu_array=False):
+    def sample_source_counts(self, N, ret_nu_array=False):
         """
         Generate a sample of source flux densities, over given area, at nu.
-
-        Parameters
-        ----------
-        area
-
-        Returns
-        -------
-
         """
-        area = ensure_unit(area, un.steradian)
-        exp_num = area * self._get_mu_in_sections(0)[0]
+
+        exp_num = self._get_mu_in_sections(0)[0]
         tot_num = np.sum(exp_num)
         exp_frac = exp_num/tot_num
 
+        nsplit = np.unique(np.random.choice(len(exp_frac), size=N, p=exp_frac), return_counts=True)[-1]
         beta = self.params['beta']
 
-        for i, (sb, b) in enumerate(zip(self.sbreak[:-1], beta)):
-            N = np.random.poisson(exp_frac[i]*tot_num)
-            nu0_sample =(((sb/un.Jy) ** (1 - b) - (self.sbreak[i+1]/un.Jy) ** (1 - b))*np.random.uniform(size=N) + (self.sbreak[i+1]/un.Jy) ** (1 - b)) ** (
+        nu0_sample = np.zeros(N)
+        nn = 0
+        for i, (sb, b,n ) in enumerate(zip(self.sbreak[:-1], beta, nsplit)):
+            nu0_sample[nn:nn+n] = (((sb/un.Jy) ** (1 - b) - (self.sbreak[i+1]/un.Jy) ** (1 - b))*np.random.uniform(size=n) + (self.sbreak[i+1]/un.Jy) ** (1 - b)) ** (
                          1./(1 - b))
+            nn +=n
 
+
+        print nu0_sample
         if ret_nu_array:
             return np.outer(self.f0, nu0_sample) * un.Jy
         else:
-            return self.f0[0] * nu0_sample * un.Jy
+            return nu0_sample * un.Jy

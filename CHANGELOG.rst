@@ -1,6 +1,11 @@
 Releases
 ========
 
+dev version
+-----------
+**Features**
+- Added spherical-based spatial distributions (TODO: spherical-based beams)
+
 v0.0.2 [18 July 2017]
 ---------------------
 **Features**
