@@ -69,7 +69,7 @@ def jyhz_to_mKMpc_per_h(power, nu, Aeff, verbose=False):
         print "Hz to Mpc: ", hz_mpc
 
     # get into K.sr (!?!)
-    jy2_K2 = (un.Jy ** 2).to(un.K ** 2 * un.steradian ** 2, equivalencies=brightness_temp2(Aeff.value))
+    jy2_K2 = (un.Jy ** 2).to(un.K ** 2 * un.steradian ** 2, equivalencies=brightness_temp(Aeff))
     out *= jy2_K2
     out /= un.Jy ** 2
     out *= un.K ** 2 * un.steradian ** 2
@@ -88,7 +88,7 @@ def jyhz_to_mKMpc_per_h(power, nu, Aeff, verbose=False):
     BW = un.steradian * (cnst.c ** 2 / nu.min() ** 2).to(un.m ** 2) / Aeff
     if verbose:
         print BW
-    vol = srhz_to_mpch(BW * (nu.max() - nu.min()), zmin)
+    vol = (BW * (nu.max() - nu.min())).to(un.Mpc**3/hub**3, equivalencies=radio_to_cosmo_equiv(nu.min(),Aeff))
 
     # vol = (Planck15.comoving_volume(zmax) - Planck15.comoving_volume(zmin)) * BW.value#(2*np.pi*beam_sig**2)
     if verbose:

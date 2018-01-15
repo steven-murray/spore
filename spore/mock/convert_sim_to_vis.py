@@ -19,8 +19,25 @@ def pos_to_baselines(pos):
     return np.array([Xsep.flatten(), Ysep.flatten()]).T
 
 
-def baselines_to_u(baselines, nu):
-    return baselines*nu*1e6/3e8
+def baselines_to_u0(baselines, nu0, umax=None, ret_baselines=False):
+    u0 =  baselines * nu0 * 1e6/3e8
+
+    if umax:
+        n = len(u0)
+        indx = np.where(np.logical_and(np.abs(u0[:, 0]) < umax, np.abs(u0[:, 1]) < umax))[0]
+        u0 = u0[indx]
+        baselines = baselines[indx]
+
+        if len(u0)< n:
+            print("%s baselines were removed due to being longer than the maximum of %s."%(n-len(u0), umax))
+
+    if ret_baselines:
+        return u0, baselines
+    else:
+        return u0
+
+def u0_to_u(u0, f0):
+    return u0*f0
 
 
 def get_sim_21cmfast(box):
@@ -62,7 +79,8 @@ def get_cut_box(box,numin=150., numax=161.15):
     box = box[:, :, ::-1]  # reverse last axis
     d = np.linspace(Planck15.comoving_distance(zstart), Planck15.comoving_distance(zend), N)
 
-    _z = np.linspace(zend, zstart, N)
+    _z = np.linspace(zstart, zend, N)
+    print _z, Planck15.comoving_distance(_z)
     dspline = spline(Planck15.comoving_distance(_z), _z)
     z = dspline(d[::-1])
     #    z = np.linspace(zend, zstart, N)
@@ -76,6 +94,7 @@ def get_cut_box(box,numin=150., numax=161.15):
     nu = nu[mask]
 
     return box, N, L * Planck15.h, d*Planck15.h, nu, z
+
 
 def sim_to_vis(box, antenna_pos, numin=150., numax=180., cosmo=Planck15, beam=CircularGaussian):
     """
@@ -125,13 +144,21 @@ def sim_to_vis(box, antenna_pos, numin=150., numax=180., cosmo=Planck15, beam=Ci
     # INITIALISE A BEAM MODEL
     beam = beam(nu.min(), np.linspace(1, nu.max()/nu.min(), len(nu)))
 
+    # Box width at different redshifts
+    width = L/cosmo.angular_diameter_distance(z).value
+
+    # Minimum umax available in simulation
+    maxl = 2*np.sin(width.max()/2 - width.max()/Nbox/2)
+    maxu = Nbox/2/maxl
+
     # GENERATE BASELINE VECTORS
     baselines = pos_to_baselines(antenna_pos)
+    u0, baselines = baselines_to_u0(baselines, nu[0], maxu, ret_baselines=True)
+
     uvsample = np.zeros((len(baselines), len(nu)), dtype="complex128")
 
 
     # ATTENUATE BOX BY THE BEAM
-    width = L/cosmo.angular_diameter_distance(z).value
     for i in range(len(nu)):
         dl = width[i]/Nbox
 
@@ -140,18 +167,21 @@ def sim_to_vis(box, antenna_pos, numin=150., numax=180., cosmo=Planck15, beam=Ci
 
         slice = box[:, :, i] * np.exp(-(L ** 2 + M ** 2)/(2*beam.sigma[i] ** 2))
 
-
         # Interpolate onto regular l,m grid
         spl_lm = RectBivariateSpline(l,l,slice)
         l = np.linspace(l.min(),l.max(),len(l))
         slice = spl_lm(l,l,grid=True)
 
         FT, freq = dft.fft(slice, L=l.max()-l.min(), a=0, b=2*np.pi)
+        uvsample[:,i] = interpolate_visibility_onto_baselines(FT, freq[0], nu[i]/nu[0], u0)
 
-        spl_rl = RectBivariateSpline(freq[0], freq[1], np.real(FT))
-        spl_im = RectBivariateSpline(freq[0], freq[1], np.imag(FT))
-        uv = baselines_to_u(baselines, nu[i])
+    return uvsample, u0, nu, {'slice':slice,'box':box,"FT":FT, 'freq':freq, "l":l}
 
-        uvsample[:, i] = spl_rl(uv[:, 0], uv[:, 1], grid=False) + 1j*spl_im(uv[:, 0], uv[:, 1], grid=False)
 
-    return uvsample, baselines, nu, {'slice':slice,'box':box,"FT":FT, 'freq':freq, "l":l,"uv":uv}
+def interpolate_visibility_onto_baselines(visibility, ugrid, f0, u0):
+
+    spl_rl = RectBivariateSpline(ugrid, ugrid, np.real(visibility))
+    spl_im = RectBivariateSpline(ugrid, ugrid, np.imag(visibility))
+    uv = u0_to_u(u0, f0)
+
+    return spl_rl(uv[:, 0], uv[:, 1], grid=False) + 1j * spl_im(uv[:, 0], uv[:, 1], grid=False)

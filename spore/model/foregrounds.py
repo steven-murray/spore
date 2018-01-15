@@ -61,8 +61,8 @@ class PointSourceCircularGaussian(object):
     def poisson_covariance(self):
         Nnu = len(self.f0)
 
-        s2 = self.beam_model.sigma ** 2
-        SIG = un.steradian * np.outer(s2, s2)/np.add.outer(s2, s2)
+        s2 = self.beam_model.sigma(self.f0) ** 2
+        SIG = un.steradian**2 * np.outer(s2, s2)/np.add.outer(s2, s2) #the outer doesn't preserve units, but add.outer does. (!?)
 
         fnu = np.add.outer(self.f0, -self.f0)
 
@@ -73,7 +73,7 @@ class PointSourceCircularGaussian(object):
 
     @property
     def eta(self):
-        return -fftfreq(len(self.f0), d=(self.f0[1] - self.f0[0]) * self.beam_model.nu0)[1:len(self.f0) / 2][::-1]
+        return -fftfreq(len(self.f0), d=(self.f0[1] - self.f0[0]) * self.beam_model.nu0.value)[1:len(self.f0) / 2][::-1] / self.beam_model.nu0.unit
 
     @property
     def redshifts(self):
@@ -199,6 +199,40 @@ class PointSourceCircularGaussian(object):
     def fourier_vis_covariance_total(self, taper=None, natural_units=False, Aeff=20.,diagonal=True):
         return self._get_fourier_vis(self.total_covariance, taper, natural_units, Aeff,diagonal)
 
+    def power_poisson(self,taper=None,natural_units=False, Aeff=20.,diagonal=True):
+        fvis = self.fourier_vis_covariance_poisson(taper=taper, natural_units=natural_units,
+                                                   Aeff=Aeff, diagonal=diagonal)
+        if natural_units:
+            return fvis/ self.effective_volume(Aeff)
+        else:
+            numax = self.f0.max() * self.beam_model.nu0
+            vol = self.effective_volume(Aeff).to(un.Mpc**3/uc.hub**3, equivalencies=uc.radio_to_cosmo_equiv(numax,Aeff))
+
+            return fvis/vol
+
+    def power_clustering(self, taper=None, natural_units=False, Aeff=20., diagonal=True):
+        fvis = self.fourier_vis_covariance_clustering(taper=taper, natural_units=natural_units,
+                                                   Aeff=Aeff, diagonal=diagonal)
+        if natural_units:
+            return fvis / self.effective_volume(Aeff)
+        else:
+            numax = self.f0.max() * self.beam_model.nu0
+            vol = self.effective_volume(Aeff).to(un.Mpc ** 3 / uc.hub ** 3,
+                                                 equivalencies=uc.radio_to_cosmo_equiv(numax, Aeff))
+
+            return fvis / vol
+
+    def power_total(self, taper=None, natural_units=False, Aeff=20., diagonal=True):
+        fvis = self.fourier_vis_covariance_total(taper=taper, natural_units=natural_units,
+                                                   Aeff=Aeff, diagonal=diagonal)
+        if natural_units:
+            return fvis / self.effective_volume(Aeff)
+        else:
+            numax = self.f0.max() * self.beam_model.nu0
+            vol = self.effective_volume(Aeff).to(un.Mpc ** 3 / uc.hub ** 3,
+                                                 equivalencies=uc.radio_to_cosmo_equiv(numax, Aeff))
+
+            return fvis / vol
 
     def _get_power_cov(self, cov, taper=None, natural_units=False, Aeff=20.,diagonal=True):
         cov_fourier = convert_cov_fg_to_cov_ps(cov, self.dnu, taper=taper)
@@ -245,7 +279,7 @@ class CircularGaussianPowerLaw(PointSourceCircularGaussian):
         gm = self.source_counts.spectral_index
 
         # Scalar quantities
-        s = self.beam_model.sigma[0]
+        s = self.beam_model.sigma(self.f0)[0]
         y = (2*np.pi*s ** 2).to(un.sr)
         mu1 = self.source_counts.total_flux_density[0]
         front = y*mu1**2
@@ -261,7 +295,6 @@ class CircularGaussianPowerLaw(PointSourceCircularGaussian):
 
         ps_term = (self.u/u0)**-kappa * un.sr
         uQ = np.outer(self.u**2,(Q-2)).reshape(self.u.shape+Q.shape) / un.sr
-        print uQ.unit, y.unit
         lastfac = np.exp(np.pi*y*uQ)
 
         return front*allnu*(ps_term*lastfac.T).T

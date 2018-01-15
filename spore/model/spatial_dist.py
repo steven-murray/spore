@@ -9,6 +9,13 @@ from spore.measure.unit_conversions import ensure_unit
 from astropy.units import rad, sr
 
 from healpy import sphtfunc, pixelfunc
+import healpy as hp
+
+try:
+    from pygsm import GlobalSkyModel2016, GlobalSkyModel
+    HAVE_PYGSM = True
+except ImportError:
+    HAVE_PYGSM = False
 
 class SpatialDistribution(Cmpt):
     """
@@ -46,15 +53,15 @@ class SpatialDistribution(Cmpt):
         self.ncells = ncells
         self.seed = seed
 
-    @cached_property
+    @property
     def resolution(self):
         return self.sky_size/self.ncells
 
-    @cached_property
+    @property
     def lgrid(self):
         return [np.arange(-s.value/2,s.value/2,r.value)[:self.ncells] * uc.un.rad for s,r in zip(self.sky_size,self.resolution)]
 
-    @cached_property
+    @property
     def cell_area(self):
         return self.resolution ** 2
 
@@ -136,14 +143,14 @@ class PureClustering_FlatSky(PureClustering):
     _defaults = PureClustering._defaults
     _defaults.update({"use_lognormal":True})
 
-    @cached_property
+    @property
     def _powerbox(self):
         if self.params['use_lognormal']:
             return LogNormalPowerBox(N=self.ncells, pk=self.params['power_spectrum'],
                                      dim=2, boxlength=np.max(self.sky_size).value,a=0,b=2*np.pi)
         else:
             return PowerBox(N=self.ncells, pk=self.params['power_spectrum'],
-                            dim=2, boxlength=np.max(self.sky_size).value,a=self.a,b=2*np.pi)
+                            dim=2, boxlength=np.max(self.sky_size).value,a=0,b=2*np.pi)
 
     def sky(self, sbar):
 
@@ -158,13 +165,17 @@ class PureClustering_FlatSky(PureClustering):
         coords_x, coords_y = np.meshgrid(self.lgrid[0], self.lgrid[0])
 
         Sbins = np.zeros((len(self.f0), self.ncells, self.ncells))
-        for i, f0 in enumerate(self.f0):
-            if i == 0:
-                Sbins[i] = sbar[i] * density
-            else:
-                x, y = np.meshgrid(self.lgrid[i], self.lgrid[i])
-                Sbins[i] = sbar[i] * griddata((coords_x.flatten(), coords_y.flatten()), density.flatten(), (x, y),
-                                              method="cubic")
+        if np.std(density)>0:
+            for i, f0 in enumerate(self.f0):
+                if i == 0:
+                    Sbins[i] = sbar[i] * density
+                else:
+                    x, y = np.meshgrid(self.lgrid[i], self.lgrid[i])
+                    Sbins[i] = sbar[i] * griddata((coords_x.flatten(), coords_y.flatten()), density.flatten(), (x, y),
+                                                  method="cubic")
+        else:
+            for i in range(len(self.f0)):
+                Sbins[i] = sbar[i]
 
         return Sbins
 
@@ -200,8 +211,11 @@ class PureClustering_Spherical(PureClustering):
     _defaults.update({"nside":64,
                       "lmax":1000})
 
-    @cached_property
+    @property
     def _healpix_deltax(self):
+        if self.seed is not None:
+            np.random.seed(self.seed)
+
         l = np.arange(1,self.params['lmax'])
         cls = self.params['power_spectrum'](l)
         return sphtfunc.synfast(cls, self.params['nside'])
@@ -214,7 +228,7 @@ class PureClustering_Spherical(PureClustering):
     def sky(self, sbar):
         healpix = self.healpix_brightness(sbar)
 
-        lm_map = [np.zeros(self.ncells * self.ncells) * np.nan] * len(self.f0)
+        lm_map = np.zeros((len(self.f0), self.ncells * self.ncells)) * np.nan
         for i,hp in enumerate(healpix):
             # Convert lgrid to co-lat and longitude in radians.
             L, M = np.meshgrid(self.lgrid[i].value, self.lgrid[i].value)
@@ -226,11 +240,15 @@ class PureClustering_Spherical(PureClustering):
             phi = np.where(M.flatten()[mask] < 0, phimod, -phimod)
             phi[np.isnan(phi)] = 0.0
 
+
             # Generate map from interpolation
             lm_map[i][mask] = pixelfunc.get_interp_val(hp, theta, phi)
-            lm_map[i] = lm_map[i].reshape((self.ncells, self.ncells))
+            #lm_map[i] = lm_map[i].reshape((self.ncells, self.ncells))
 
-        return np.array(lm_map)
+            #print i, lm.max(), L.max(), M.max(), lm_map[i][500]
+
+        lm_map = lm_map.reshape((len(self.f0), self.ncells, self.ncells))
+        return lm_map
 
 
 def randsphere(n, theta_range = (0,np.pi), phi_range = (0,2*np.pi)):
@@ -270,8 +288,11 @@ class PoissonClustering_Spherical(PoissonClustering_FlatSky):
     def _powerbox(self):
         raise AttributeError("'PoissonClustering_Spherical' object has no attribute '_powerbox'")
 
-    @cached_property
+    @property
     def _healpix_deltax(self):
+        if self.seed is not None:
+            np.random.seed(self.seed)
+
         l = np.arange(1,self.params['lmax'])
         cls = self.params['power_spectrum'](l)
         return sphtfunc.synfast(cls, self.params['nside'])
@@ -327,3 +348,51 @@ class PoissonClustering_Spherical(PoissonClustering_FlatSky):
 
     def sky(self, pos, fluxes, spec_indices):
         return PoissonClustering_FlatSky.sky(self,pos, fluxes, spec_indices)
+
+#
+# def rotate_map(hmap, rot_theta, rot_phi):
+#     nside = hp.npix2nside(len(hmap))
+#
+#     # Get theta, phi for non-rotated map
+#     t, p = hp.pix2ang(nside, np.arange(hp.nside2npix(nside)))  # theta, phi
+#
+#     # Define a rotator
+#     r = hp.Rotator(deg=False, rot=[rot_phi, rot_theta])
+#
+#     # Get theta, phi under rotated co-ordinates
+#     trot, prot = r(t, p)
+#
+#     # Inerpolate map onto these co-ordinates
+#     rot_map = hp.get_interp_val(hmap, trot, prot)
+#
+#     return rot_map
+
+if HAVE_PYGSM:
+    class GSM(PureClustering_Spherical):
+        _defaults = dict(use_2008=False,
+                         theta0=0,
+                         phi0=0,
+                         nu0 = 150.,
+                         low_res=False)
+
+        @property
+        def _healpix_deltax(self):
+            raise AttributeError("'GSM' object has no attribute '_healpix_deltax'")
+
+        def healpix_brightness(self, sbar):
+            if self.params['use_2008']:
+                gsm = GlobalSkyModel(unit="MJysr", theta_rot = self.params['theta0'], phi_rot = self.params['phi0'],
+                                     resolution="lo" if self.params['low_res'] else "hi")
+            else:
+                gsm = GlobalSkyModel2016(unit="MJysr", theta_rot = self.params['theta0'], phi_rot = self.params['phi0'],
+                                         resolution="lo" if self.params['low_res'] else "hi")  #This only works for the steven-murray/PyGSM fork.
+
+            gsm.generate(self.params['nu0'] * self.f0)
+
+            data = np.atleast_2d(gsm.generated_map_data) * 1e6
+            # rot_map = np.zeros_like(data)
+            #
+            # for i in range(len(self.f0)):
+            #     rot_map[i] = 1e6 * rotate_map(data[i], self.params['theta0'], self.params['phi0']) #1e6 because units are MJy
+
+            return data

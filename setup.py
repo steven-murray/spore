@@ -31,8 +31,8 @@ if sys.argv[-1] == "publish":
 
 
 resample = Extension('spore.fortran_routines.resample', ['spore/fortran_routines/resample.f90'],
-                    extra_f90_compile_args=['-Wall', '-Wtabs', '-fopenmp'],
-                    f2py_options=['only:', "lay_ps_map", ":"],
+                    extra_f90_compile_args=['-Wall', '-Wtabs', '-fopenmp','-fbounds-check'],
+                    f2py_options=['only:', "grid_visibilities", ":"],
                     libraries=['gomp']
                     )
 direct_ft = Extension('spore.fortran_routines.direct_ft', ['spore/fortran_routines/direct_ft.f90'],
@@ -48,7 +48,7 @@ setup(
                       "astropy>=1.0",
                       "scipy>=0.16",
                       "cached_property",
-                      "powerbox==0.4.3",
+                      "powerbox>=0.4.3",
                       'psutil',
                       'healpy'],
     author="Steven Murray",

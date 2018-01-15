@@ -1,5 +1,5 @@
 import numpy as np
-from ps_foregrounds import PointSourceForegrounds
+from foregrounds import PointSourceForegrounds
 
 def visibility_covariance(foreground_model = PointSourceForegrounds, niter=30,seed=None,
                           ret_realisations=False, *args,**kwargs):
