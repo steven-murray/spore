@@ -2,7 +2,7 @@ from astropy import units as un
 import numpy as np
 from astropy.cosmology import Planck15
 import astropy.constants as cnst
-from spore.common_tools import ensure_unit
+from spore.common import ensure_unit
 
 
 hub = un.def_unit('h',un.dimensionless_unscaled*Planck15.h)
@@ -66,7 +66,7 @@ def jyhz_to_mKMpc_per_h(power, nu, Aeff, verbose=False):
     out /= un.Hz ** 2
     out *= un.Mpc ** 2
     if verbose:
-        print "Hz to Mpc: ", hz_mpc
+        print("Hz to Mpc: ", hz_mpc)
 
     # get into K.sr (!?!)
     jy2_K2 = (un.Jy ** 2).to(un.K ** 2 * un.steradian ** 2, equivalencies=brightness_temp(Aeff))
@@ -74,7 +74,7 @@ def jyhz_to_mKMpc_per_h(power, nu, Aeff, verbose=False):
     out /= un.Jy ** 2
     out *= un.K ** 2 * un.steradian ** 2
     if verbose:
-        print "Jy^2 to K^2 sr^2: ", jy2_K2
+        print("Jy^2 to K^2 sr^2: ", jy2_K2)
 
     # Convert sr^2 to Mpc^4/h^4
     sr2_mpc4 = (un.steradian ** 2).to(un.Mpc ** 4, equivalencies=cosmo_21cm_angle_equiv(zmin))
@@ -82,17 +82,17 @@ def jyhz_to_mKMpc_per_h(power, nu, Aeff, verbose=False):
     out /= un.steradian ** 2
     out *= un.Mpc ** 4
     if verbose:
-        print "sr^2 to mpc^4: ", sr2_mpc4
+        print("sr^2 to mpc^4: ", sr2_mpc4)
 
     # Norm by volume
     BW = un.steradian * (cnst.c ** 2 / nu.min() ** 2).to(un.m ** 2) / Aeff
     if verbose:
-        print BW
+        print(BW)
     vol = (BW * (nu.max() - nu.min())).to(un.Mpc**3/hub**3, equivalencies=radio_to_cosmo_equiv(nu.min(),Aeff))
 
     # vol = (Planck15.comoving_volume(zmax) - Planck15.comoving_volume(zmin)) * BW.value#(2*np.pi*beam_sig**2)
     if verbose:
-        print "Volume: ", vol
+        print("Volume: ", vol)
     out /= vol
     out = out.to(un.milliKelvin ** 2 * un.Mpc ** 3 / hub ** 3)
     return out

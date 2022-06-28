@@ -1,36 +1,53 @@
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm, SymLogNorm
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 import numpy as np
 
 
-def plot_2D_PS(ps, kperp, kpar, make_label=True, fig=None, ax=None, interp=None):
+def plot_2D_PS(ps, kperp, kpar, kperp_logspace=False, kpar_logspace=False,
+               make_label=True, fig=None, ax=None, interp=None):
     if fig is None or ax is None:
         fig, ax = plt.subplots()
+
+    if ps.shape != (len(kpar), len(kperp)):
+        raise ValueError("Shape of PS must be (kpar, kperp)")
 
     PS = getattr(ps, "value", ps)
     KPERP = getattr(kperp, "value", kperp)
     KPAR = getattr(kpar, "value", kpar)
 
+    if kperp_logspace:
+        KPERP = np.log10(kperp)
+    if kpar_logspace:
+        KPAR = np.log10(kpar)
+
+
     cax = ax.imshow(PS, origin="lower", norm=LogNorm(), aspect='auto',
                     extent=(KPERP.min(), KPERP.max(), KPAR.min(), KPAR.max()),
                     interpolation=interp)
 
-    ax.set_xscale('log')
-    ax.set_yscale('log')
+    if not kperp_logspace:
+        ax.set_xscale('log')
+    if not kpar_logspace:
+        ax.set_yscale('log')
+
     cbar = fig.colorbar(cax)
 
     if make_label:
         cbar.ax.set_ylabel(r"Power, $[{\rm mK}^2 h^{-3}{\rm Mpc}^3]$", fontsize=13)
-        # cax.yaxis.set_label_position("right")
 
-        plt.xlabel(r"$k_{\perp}$, $[h{\rm Mpc}^{-1}]$", fontsize=15)
-        plt.ylabel(r"$k_{||}$, $[h{\rm Mpc}^{-1}]$", fontsize=15)
+        if not kperp_logspace:
+            plt.xlabel(r"$k_{\perp}$, $[h{\rm Mpc}^{-1}]$", fontsize=15)
+        else:
+            plt.xlabel(r"$\log_{10} k_{\perp}$, $[h{\rm Mpc}^{-1}]$", fontsize=15)
+        if not kpar_logspace:
+            plt.ylabel(r"$k_{||}$, $[h{\rm Mpc}^{-1}]$", fontsize=15)
+        else:
+            plt.ylabel(r"$\log_{10} k_{||}$, $[h{\rm Mpc}^{-1}]$", fontsize=15)
 
     plt.ylim(KPAR.min(),KPAR.max())
     plt.xlim(KPERP.min(),KPERP.max())
 
-    return fig, ax
+    return fig, ax, cbar
 
 
 def plot_2D_PS_compare(ps_list, kperp, kpar, plt_labels=None, interp=None):
@@ -72,19 +89,25 @@ def plot_2D_PS_compare(ps_list, kperp, kpar, plt_labels=None, interp=None):
     return fig, ax
 
 
-
-def plot_sig_to_noise_compare(ratio_list, kperp, kpar, plt_labels=None, interp=None):
+def plot_sig_to_noise_compare(ratio_list, kperp, kpar, plt_labels=None, interp=None, kpar_logscale=False,
+                              kperp_logscale=False):
     fig, ax = plt.subplots(len(ratio_list[0]), len(ratio_list),
                            figsize=(5.5*len(ratio_list), 5*len(ratio_list[0])),
                            sharex=True, sharey=True,
-                           subplot_kw={"xscale": 'log', "yscale": 'log'},
+                           subplot_kw={"xscale": 'log' if not kperp_logscale else None,
+                                       "yscale": 'log' if not kpar_logscale else None},
                            gridspec_kw={"hspace": 0.05, "wspace": 0.05},
                            squeeze=False)
 
     KPERP = getattr(kperp, "value", kperp)
     KPAR = getattr(kpar, "value", kpar)
 
-    colscale = np.max(np.abs(np.log10(ratio_list)))
+    if kperp_logscale:
+        KPERP = np.log10(KPERP)
+    if kpar_logscale:
+        KPAR = np.log10(KPAR)
+
+    colscale = np.nanmax(np.abs(np.log10(ratio_list)))
     cax = []
     for i, sublist in enumerate(ratio_list):
         cax.append([])
@@ -101,10 +124,16 @@ def plot_sig_to_noise_compare(ratio_list, kperp, kpar, plt_labels=None, interp=N
     colax.ax.set_ylabel(r"Signal to Noise")
 
     for x in ax.T:
-        x[-1].set_xlabel(r"$k_{\perp}$, $[h{\rm Mpc}^{-1}]$")
+        if not kperp_logscale:
+            x[-1].set_xlabel(r"$k_{\perp}$, $[h{\rm Mpc}^{-1}]$")
+        else:
+            x[-1].set_xlabel(r"$\log_{10} k_{\perp}$, $[h{\rm Mpc}^{-1}]$")
 
     for x in ax:
-        x[0].set_ylabel(r"$k_{||}$, $[h{\rm Mpc}^{-1}]$")
+        if not kpar_logscale:
+            x[0].set_ylabel(r"$k_{||}$, $[h{\rm Mpc}^{-1}]$")
+        else:
+            x[0].set_ylabel(r"$\log_{10} k_{||}$, $[h{\rm Mpc}^{-1}]$")
 
     if plt_labels is not None:
         for i, sublist in enumerate(plt_labels):
@@ -160,7 +189,7 @@ def plot_2D_PS_ratio_diff(ps1, ps2, kperp, kpar, make_label=True, fig=None, ax=N
     return fig, ax
 
 
-def plot_2D_PS_frac_tot(ps1, ps2, kperp, kpar, make_label=True, fig=None, ax=None, interp=None, lognorm=True):
+def plot_2D_PS_frac_tot(ps1, ps2, kperp, kpar, make_label=True, fig=None, ax=None, interp=None, lognorm=True,):
     if fig is None or ax is None:
         fig, ax = plt.subplots(1, 2, figsize=(11, 5), sharex=True, sharey=True,
                                subplot_kw={"xscale": 'log', "yscale": 'log'})

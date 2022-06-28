@@ -7,7 +7,7 @@ import numpy as np
 from astropy import constants
 from astropy import units as un
 from _framework import Component as Cmpt
-from spore.common_tools import ensure_unit
+from spore.common import ensure_unit
 
 
 class Beam(Cmpt):

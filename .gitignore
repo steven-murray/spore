@@ -5,3 +5,4 @@ spore.egg-info/*
 *.ipynb_checkpoints*
 .idea/*
 *~
+*.so

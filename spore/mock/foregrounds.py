@@ -14,8 +14,8 @@ from astropy import constants as cnst
 from astropy.cosmology import Planck15
 
 from convert_sim_to_vis import interpolate_visibility_onto_baselines, baselines_to_u0
-from spore.measure.ps_2d_from_single_vis import grid_visibilities, power_spec_from_visibility, vis_to_3d_ps, ps_3d_to_ps_2d, correct_raw_2d_ps
-from spore.measure import unit_conversions as uc
+from spore.measure.ps_2d_from_single_vis import grid_visibilities, power_spec_from_visibility, vis_to_3d_ps, ps_3d_to_ps_2d
+from spore.common import unit_conversions as uc
 
 
 class ForegroundComponentMock(object):
@@ -31,7 +31,8 @@ class ForegroundComponentMock(object):
             print("WARNING: The sky size does not allow for the beam to attenuate enough")
 
     @cached_property
-    def sky(self):
+    def sky_flux(self):
+
         raise NotImplementedError("This is not implemented in the base class")
 
     def horizon_line(self, kperp, z):

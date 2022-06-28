@@ -4,9 +4,9 @@ A module for defining source count models
 from cached_property import cached_property
 import numpy as np
 from scipy.integrate import simps
-from spore.common_tools import ensure_unit, nfold_outer
-from spore.measure.unit_conversions import un
-from _framework import Component as Cmpt
+from spore.common import ensure_unit, nfold_outer
+from spore.common.unit_conversions import un
+from ._framework import Component as Cmpt
 
 class SourceCounts(Cmpt):
     """
@@ -269,7 +269,6 @@ class MultiPowerLawSourceCounts(SourceCounts):
             nn +=n
 
 
-        print nu0_sample
         if ret_nu_array:
             return np.outer(self.f0, nu0_sample) * un.Jy
         else:

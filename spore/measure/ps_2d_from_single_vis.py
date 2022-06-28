@@ -4,8 +4,8 @@ This module contains functions which take an input visibility grid and convert i
 import numpy as np
 from powerbox import dft
 dft.THREADS = 1
-from powerbox.tools import angular_average, angular_average_nd
-import unit_conversions as uc
+from powerbox.tools import angular_average_nd
+from spore.common import unit_conversions as uc
 from spore.fortran_routines.resample import lay_ps_map
 
 

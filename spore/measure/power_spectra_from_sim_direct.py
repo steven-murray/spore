@@ -75,7 +75,7 @@ def get_power_lightcone(fname, numin=150., numax=161.15, get_delta=True, bins=50
     Parameters
     ----------
     fname : str
-        Filename of 21cmFAST simulation box. Should *not* be a lighttravel box.
+        Filename of 21cmFAST simulation box. Should be a lighttravel box.
 
     numin, numax : float
         Min/Max frequencies of the "observation", in MHz. Used to cut the box before PS estimation.
@@ -117,6 +117,7 @@ def get_power_lightcone(fname, numin=150., numax=161.15, get_delta=True, bins=50
         k_other = res[2][0]
 
         P = P[np.logical_not(np.isnan(kav))]
+
         P = P[:,k_other>0]
 
         kav = kav[np.logical_not(np.isnan(kav))]

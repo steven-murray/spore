@@ -31,8 +31,8 @@ if sys.argv[-1] == "publish":
 
 
 resample = Extension('spore.fortran_routines.resample', ['spore/fortran_routines/resample.f90'],
-                    extra_f90_compile_args=['-Wall', '-Wtabs', '-fopenmp','-fbounds-check'],
-                    f2py_options=['only:', "grid_visibilities", ":"],
+                    extra_f90_compile_args=['-Wall', '-Wtabs', '-fopenmp'], # Put the following also if testing: '-fbounds-check'
+                    f2py_options=['only:', "grid_visibilities_tophat", "grid_visibilities_gauss", ":"],
                     libraries=['gomp']
                     )
 direct_ft = Extension('spore.fortran_routines.direct_ft', ['spore/fortran_routines/direct_ft.f90'],

@@ -80,7 +80,6 @@ def get_cut_box(box,numin=150., numax=161.15):
     d = np.linspace(Planck15.comoving_distance(zstart), Planck15.comoving_distance(zend), N)
 
     _z = np.linspace(zstart, zend, N)
-    print _z, Planck15.comoving_distance(_z)
     dspline = spline(Planck15.comoving_distance(_z), _z)
     z = dspline(d[::-1])
     #    z = np.linspace(zend, zstart, N)

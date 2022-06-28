@@ -77,7 +77,7 @@ class Box(object):
         return crit_delta
 
 
-def readbox(filename, verbose=True):
+def readbox(filename, verbose=False):
     # read a 21cmfast output file and return a Box object with data
 
     # parse filename to (1) check its a 21cmFast box (2) get box parameters

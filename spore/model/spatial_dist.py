@@ -1,15 +1,13 @@
 import numpy as np
-from cached_property import cached_property
-import spore.measure.unit_conversions as uc
+import spore.common.unit_conversions as uc
 
 from powerbox import LogNormalPowerBox, PowerBox
 from scipy.interpolate import griddata
 from _framework import Component as Cmpt
-from spore.measure.unit_conversions import ensure_unit
-from astropy.units import rad, sr
+from spore.common.unit_conversions import ensure_unit
+from astropy.units import rad
 
 from healpy import sphtfunc, pixelfunc
-import healpy as hp
 
 try:
     from pygsm import GlobalSkyModel2016, GlobalSkyModel

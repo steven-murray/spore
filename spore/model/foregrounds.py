@@ -16,8 +16,7 @@ import astropy.constants as cnst
 
 from scipy.special import hyp1f1
 from itertools import product
-from spore.measure import unit_conversions as uc
-from spore.common_tools import ensure_unit
+from spore.common import ensure_unit, unit_conversions as uc
 from powerbox.dft import fftfreq
 
 

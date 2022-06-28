@@ -1,3 +1,6 @@
+"""
+Common tools used across the board.
+"""
 import numpy as np
 
 def ensure_unit(val,unit):

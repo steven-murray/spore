@@ -3,14 +3,12 @@ A module for producing point-source foreground mocks.
 """
 import numpy as np
 from cached_property import cached_property
-from spore.model.source_counts import PowerLawSourceCounts
-from spore.model.beam import CircularGaussian
 
-import spore.measure.unit_conversions as uc
+import spore.common.unit_conversions as uc
 
 from powerbox import LogNormalPowerBox, PowerBox
 from powerbox.powerbox import _magnitude_grid
-from powerbox.dft import fft,ifft,fftfreq
+from powerbox.dft import fft, fftfreq
 
 from scipy.interpolate import griddata
 
